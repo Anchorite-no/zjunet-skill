@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "proxy": {
+    "client": "auto",
+    "mixed_port": 7890,
+    "dns_port": 1053,
+    "allow_lan": false,
+    "public_group": ""
+  },
+  "campus": {
+    "server": "rvpn.zju.edu.cn",
+    "username": "<LOCAL_USERNAME>",
+    "socks_port": 11080,
+    "proxy_name": "CAMPUS-SOCKS",
+    "group_name": "CAMPUS"
+  },
+  "conditional_dns": {
+    "listen_port": 1054,
+    "health_port": 1055,
+    "public_servers": ["1.1.1.1:53", "8.8.8.8:53"],
+    "campus_servers": ["<LOCAL_CAMPUS_DNS>:53"],
+    "campus_suffixes": ["+.zju.edu.cn"],
+    "vpn_bootstrap_names": ["rvpn.zju.edu.cn"],
+    "physical_dns": ["<AUTO_DISCOVER>"],
+    "proxy_doh": ["https://1.1.1.1/dns-query"]
+  },
+  "routing": {
+    "physical_lan_cidr": "<AUTO_DISCOVER>",
+    "campus_cidrs": ["<LOCAL_CAMPUS_CIDR>"],
+    "tailnet_cidr": "",
+    "tailnet_dns": ""
+  },
+  "probes": {
+    "public_multi_resource": "https://www.bilibili.com/",
+    "proxy_connectivity": "https://www.gstatic.com/generate_204",
+    "campus_page": "<LOCAL_CAMPUS_URL>"
+  }
+}

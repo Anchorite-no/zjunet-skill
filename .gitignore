@@ -1,0 +1,26 @@
+# Machine-local input and generated output
+local/
+out/
+*.local.json
+*.secret.*
+*.log
+*.etl
+*.pcap*
+*.zip
+*.exe
+*.dll
+*.db
+*.sqlite
+*.clixml
+
+# Client state must never enter this repository
+profiles/
+recovery/
+captures/
+config.yaml
+shared_preferences.json
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
