@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSCommandPath
 $expectedOutput=[IO.Path]::GetFullPath((Join-Path $root 'out'))
-if(-not[IO.Path]::GetFullPath($OutputDirectory).Equals($expectedOutput,[StringComparison]::OrdinalIgnoreCase)){throw'OutputDirectory is fixed to the repository out directory.'}
+if(-not[IO.Path]::GetFullPath($OutputDirectory).Equals($expectedOutput,[StringComparison]::OrdinalIgnoreCase)){throw 'OutputDirectory is fixed to the repository out directory.'}
 
 function Read-Config([string]$Path){
     return Get-Content -LiteralPath $Path -Raw -Encoding UTF8|ConvertFrom-Json -Depth 50
@@ -37,9 +37,9 @@ function Get-ValidationErrors($Config,[string]$Path){
     $ports=@([int]$Config.proxy.mixed_port,[int]$Config.proxy.dns_port,[int]$Config.campus.socks_port,[int]$Config.conditional_dns.listen_port,[int]$Config.conditional_dns.health_port)
     if(@($ports|Where-Object{$_-lt1025-or$_-gt65535}).Count){$errors.Add('Every local listener port must be between 1025 and 65535.')}
     if(@($ports|Sort-Object -Unique).Count-ne$ports.Count){$errors.Add('Local listener ports must be unique.')}
-    foreach($endpoint in @($Config.conditional_dns.public_servers)+@($Config.conditional_dns.campus_servers)){if($endpoint-notmatch'<[^>]+>'-and$endpoint-notmatch'^[A-Za-z0-9.-]+:[0-9]{1,5}$'){$errors.Add('DNS endpoints must use host:port syntax.')}}
+    foreach($endpoint in @($Config.conditional_dns.public_servers)+@($Config.conditional_dns.campus_servers)){if($endpoint-match'<[^>]+>'){continue};if($endpoint-notmatch'^([A-Za-z0-9.-]+):([0-9]{1,5})$'){$errors.Add('DNS endpoints must use host:port syntax.');continue};$endpointHost=$Matches[1];$upstreamPort=[int]$Matches[2];if($upstreamPort-lt1-or$upstreamPort-gt65535){$errors.Add('DNS upstream ports must be between 1 and 65535.')};if($endpointHost-match'^[0-9.]+$'){$parsedHost=$null;if(-not[Net.IPAddress]::TryParse($endpointHost,[ref]$parsedHost)){$errors.Add('Numeric DNS hosts must be valid IP addresses.')}}}
     foreach($address in @($Config.conditional_dns.physical_dns)){if($address-notmatch'<[^>]+>'){$parsed=$null;if(-not[Net.IPAddress]::TryParse([string]$address,[ref]$parsed)){$errors.Add('physical_dns must contain IP addresses.')}}}
-    foreach($cidr in @([string]$Config.routing.physical_lan_cidr)+@($Config.routing.campus_cidrs)+@([string]$Config.routing.tailnet_cidr|Where-Object{$_})){if($cidr-notmatch'<[^>]+>'-and$cidr-notmatch'^[A-Za-z0-9:.]+/[0-9]{1,3}$'){$errors.Add('Routing prefixes must use CIDR syntax.')}}
+    foreach($cidr in @([string]$Config.routing.physical_lan_cidr)+@($Config.routing.campus_cidrs)+@([string]$Config.routing.tailnet_cidr|Where-Object{$_})){if($cidr-match'<[^>]+>'){continue};if($cidr-notmatch'^([^/]+)/([0-9]{1,3})$'){$errors.Add('Routing prefixes must use CIDR syntax.');continue};$network=$null;$prefix=[int]$Matches[2];if(-not[Net.IPAddress]::TryParse($Matches[1],[ref]$network)){$errors.Add('Routing prefixes must start with a valid IP address.');continue};$maximum=if($network.AddressFamily-eq[Net.Sockets.AddressFamily]::InterNetwork){32}else{128};if($prefix-gt$maximum){$errors.Add('Routing prefix length is outside the address-family range.')}}
     foreach($url in @([string]$Config.probes.public_multi_resource,[string]$Config.probes.proxy_connectivity,[string]$Config.probes.campus_page)){if($url-notmatch'<[^>]+>'){$uri=$null;if(-not[uri]::TryCreate($url,[UriKind]::Absolute,[ref]$uri)-or$uri.Scheme-notin@('http','https')){$errors.Add('Probe URLs must be absolute HTTP(S) URLs.')}}}
     return @($errors|Sort-Object -Unique)
 }
@@ -119,7 +119,7 @@ $plan=[ordered]@{
         'Attach managed-overlay.js through the selected client mechanism.',
         'Enable the proxy client TUN settings shown in docs/replication-guide.md.',
         'Start a conditional DNS implementation using conditional-dns.json.',
-        'Run bootstrap verify and scripts/zjunet.ps1 doctor.'
+        'Run bootstrap smoke, then complete the manual end-to-end matrix in docs/replication-guide.md.'
     )
     protected_no_change=@('existing proxy Core','TUN driver without explicit approval','dynamic port ranges','firewall','static routes','gateway','unrelated adapters')
     ports=[ordered]@{mixed=$config.proxy.mixed_port;proxy_dns=$config.proxy.dns_port;conditional_dns=$config.conditional_dns.listen_port;conditional_health=$config.conditional_dns.health_port;campus_socks=$config.campus.socks_port}
@@ -128,7 +128,7 @@ $plan=[ordered]@{
 
 if($Stage-eq'build'){Write-Host "Generated sanitized local artifacts in $OutputDirectory" -ForegroundColor Green;exit 0}
 
-if($overlay-match'<[^>]+>' -or (Get-Content (Join-Path $OutputDirectory 'conditional-dns.json') -Raw)-match'<[^>]+>'){throw'Generated output still contains placeholders.'}
-if(Get-Command node.exe -ErrorAction SilentlyContinue){& node.exe --check (Join-Path $OutputDirectory 'managed-overlay.js');if($LASTEXITCODE-ne0){throw'Generated overlay failed JavaScript syntax validation.'}}
+if($overlay-match'<[^>]+>' -or (Get-Content (Join-Path $OutputDirectory 'conditional-dns.json') -Raw)-match'<[^>]+>'){throw 'Generated output still contains placeholders.'}
+if(Get-Command node.exe -ErrorAction SilentlyContinue){& node.exe --check (Join-Path $OutputDirectory 'managed-overlay.js');if($LASTEXITCODE-ne0){throw 'Generated overlay failed JavaScript syntax validation.'}}
 & (Join-Path $root 'scripts\zjunet.ps1') doctor -ConfigPath $ConfigPath
 exit $LASTEXITCODE
