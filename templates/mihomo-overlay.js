@@ -45,6 +45,7 @@ function main(config) {
   for (const name of T.conditional_dns.vpn_bootstrap_names) policy[name] = physical;
   for (const suffix of T.conditional_dns.campus_suffixes) policy[suffix] = campus;
   if (T.routing.tailnet_dns) policy["+.ts.net"] = ["udp://" + T.routing.tailnet_dns + "#DIRECT"];
+  policy["geosite:gfw"] = T.conditional_dns.proxy_doh.map((url) => T.proxy.public_group ? url + "#" + T.proxy.public_group : url);
 
   config.dns = Object.assign({}, config.dns || {}, {
     enable: true,

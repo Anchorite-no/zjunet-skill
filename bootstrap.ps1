@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Position=0)][ValidateSet('plan','build','verify')][string]$Stage='plan',
+    [Parameter(Position=0)][ValidateSet('plan','build','smoke')][string]$Stage='plan',
     [string]$ConfigPath=(Join-Path $PSScriptRoot 'config\topology.example.json'),
     [string]$OutputDirectory=(Join-Path $PSScriptRoot 'out')
 )
@@ -30,8 +30,23 @@ function Get-Listener([int]$Port){
     return [pscustomobject]@{ready=$true;owner=if($process){[string]$process.ProcessName}else{'unknown'}}
 }
 
+function Get-ValidationErrors($Config,[string]$Path){
+    $errors=[Collections.Generic.List[string]]::new()
+    $localRoot=[IO.Path]::GetFullPath((Join-Path $root 'local'))
+    if(-not[IO.Path]::GetFullPath($Path).StartsWith($localRoot+'\',[StringComparison]::OrdinalIgnoreCase)){$errors.Add('ConfigPath must be inside the ignored local directory.')}
+    $ports=@([int]$Config.proxy.mixed_port,[int]$Config.proxy.dns_port,[int]$Config.campus.socks_port,[int]$Config.conditional_dns.listen_port,[int]$Config.conditional_dns.health_port)
+    if(@($ports|Where-Object{$_-lt1025-or$_-gt65535}).Count){$errors.Add('Every local listener port must be between 1025 and 65535.')}
+    if(@($ports|Sort-Object -Unique).Count-ne$ports.Count){$errors.Add('Local listener ports must be unique.')}
+    foreach($endpoint in @($Config.conditional_dns.public_servers)+@($Config.conditional_dns.campus_servers)){if($endpoint-notmatch'<[^>]+>'-and$endpoint-notmatch'^[A-Za-z0-9.-]+:[0-9]{1,5}$'){$errors.Add('DNS endpoints must use host:port syntax.')}}
+    foreach($address in @($Config.conditional_dns.physical_dns)){if($address-notmatch'<[^>]+>'){$parsed=$null;if(-not[Net.IPAddress]::TryParse([string]$address,[ref]$parsed)){$errors.Add('physical_dns must contain IP addresses.')}}}
+    foreach($cidr in @([string]$Config.routing.physical_lan_cidr)+@($Config.routing.campus_cidrs)+@([string]$Config.routing.tailnet_cidr|Where-Object{$_})){if($cidr-notmatch'<[^>]+>'-and$cidr-notmatch'^[A-Za-z0-9:.]+/[0-9]{1,3}$'){$errors.Add('Routing prefixes must use CIDR syntax.')}}
+    foreach($url in @([string]$Config.probes.public_multi_resource,[string]$Config.probes.proxy_connectivity,[string]$Config.probes.campus_page)){if($url-notmatch'<[^>]+>'){$uri=$null;if(-not[uri]::TryCreate($url,[UriKind]::Absolute,[ref]$uri)-or$uri.Scheme-notin@('http','https')){$errors.Add('Probe URLs must be absolute HTTP(S) URLs.')}}}
+    return @($errors|Sort-Object -Unique)
+}
+
 $config=Read-Config $ConfigPath
 $missing=@(Find-Placeholders $config|Sort-Object -Unique)
+$validation=@(Get-ValidationErrors $config $ConfigPath)
 
 if($Stage-eq'plan'){
     $mixed=Get-Listener ([int]$config.proxy.mixed_port)
@@ -40,6 +55,7 @@ if($Stage-eq'plan'){
         schema_version=1
         config_is_local=([IO.Path]::GetFullPath($ConfigPath)-notlike([IO.Path]::GetFullPath((Join-Path $root 'config\topology.example.json'))))
         missing_fields=$missing
+        validation_errors=$validation
         detected=[pscustomobject]@{
             mixed_listener=$mixed.ready
             mixed_owner=$mixed.owner
@@ -49,13 +65,14 @@ if($Stage-eq'plan'){
             zju_connect=[bool](Get-Command zju-connect.exe -ErrorAction SilentlyContinue)
             tailscale=[bool](Get-Service Tailscale -ErrorAction SilentlyContinue)
         }
-        ready_to_build=($missing.Count-eq0)
-        next=if($missing.Count){'Copy the example to local/topology.local.json and fill only the listed fields locally.'}else{'Run bootstrap.ps1 build, inspect out/replication-plan.json, then follow docs/replication-guide.md.'}
+        ready_to_build=($missing.Count-eq0-and$validation.Count-eq0)
+        next=if($missing.Count-or$validation.Count){'Copy the example to local/topology.local.json and fix the listed local fields.'}else{'Run bootstrap.ps1 build, inspect out/replication-plan.json, then follow docs/replication-guide.md.'}
     }|ConvertTo-Json -Depth 8
     exit 0
 }
 
 if($missing.Count){throw('Unresolved local fields: '+($missing-join', '))}
+if($validation.Count){throw('Invalid local config: '+($validation-join' '))}
 if(Test-Path -LiteralPath $OutputDirectory){Remove-Item -LiteralPath $OutputDirectory -Recurse -Force}
 [void](New-Item -ItemType Directory -Path $OutputDirectory)
 

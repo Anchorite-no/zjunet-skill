@@ -84,4 +84,4 @@ pwsh -NoProfile -File .\bootstrap.ps1 build -ConfigPath .\local\topology.local.j
 - LAN/Tailnet 绕过；
 - 公网页面的 HTML、API、静态文件、图片和媒体资源。
 
-最后运行 `bootstrap.ps1 verify` 和 `scripts/zjunet.ps1 doctor`。任何 FAIL 都不能解释成成功。
+最后运行 `bootstrap.ps1 smoke` 检查本地监听器，再完成上面的端到端矩阵。`smoke` 或 `doctor` 的本地端口通过不能解释成完整成功。

@@ -12,7 +12,7 @@ This repository is a sanitized handoff of a working Windows network design. Repr
 4. Ask the user to put machine-local values in `local/topology.local.json` and credentials in the official client or a local protected credential store.
 5. Run `bootstrap.ps1 build` and inspect `out/replication-plan.json` before changing applications.
 6. Install missing public software from its official release source. Reuse installed FlClash, Clash Verge Rev, Mihomo, ZJU Connect, and Tailscale when available.
-7. Attach the generated overlay through the supported client mechanism, restart only the affected component, then run `bootstrap.ps1 verify` and `scripts/zjunet.ps1 doctor`.
+7. Attach the generated overlay through the supported client mechanism, restart only the affected component, then run `bootstrap.ps1 smoke` and the full manual verification matrix. Smoke success is not end-to-end success.
 
 ## Secret boundary
 

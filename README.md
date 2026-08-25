@@ -55,7 +55,7 @@ AI 应明确告诉用户还要在本机补充什么。通常只有：
 New-Item -ItemType Directory .\local -Force
 Copy-Item .\config\topology.example.json .\local\topology.local.json
 pwsh -NoProfile -File .\bootstrap.ps1 build -ConfigPath .\local\topology.local.json
-pwsh -NoProfile -File .\bootstrap.ps1 verify -ConfigPath .\local\topology.local.json
+pwsh -NoProfile -File .\bootstrap.ps1 smoke -ConfigPath .\local\topology.local.json
 ```
 
 构建会生成：
@@ -63,6 +63,8 @@ pwsh -NoProfile -File .\bootstrap.ps1 verify -ConfigPath .\local\topology.local.
 - `out/managed-overlay.js`：交给 FlClash / Clash Verge 的托管脚本；
 - `out/conditional-dns.json`：条件 DNS 解析器所需的无凭据配置；
 - `out/replication-plan.json`：AI 可以逐项执行和验证的本机计划。
+
+仓库只交付条件 DNS 的接口合同和配置生成，不包含解析器程序本身。复刻者需要按 [条件 DNS 合同](docs/replication-guide.md#6-条件-dns) 实现或接入已有解析器；`smoke` 只检查本地监听器，不等同于完整端到端验证。
 
 完整落地顺序见 [复刻指南](docs/replication-guide.md)。
 
