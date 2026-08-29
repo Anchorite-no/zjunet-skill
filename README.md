@@ -9,16 +9,23 @@
 ## 整体结构
 
 ```mermaid
-flowchart LR
-    APP["Windows 应用"] --> TUN["FlClash / Clash Verge 的 Mihomo TUN"]
-    TUN --> DIRECT["物理网络 / LAN / Tailnet"]
-    TUN --> PROXY["现有订阅，复用 mixed-port 7890"]
-    TUN --> CAMPUS["ZJU Connect SOCKS 11080"]
-    TUN --> DNS["本地 DNS 策略"]
-    DNS --> PUBLIC["公共 DNS"]
-    DNS --> CDNS["校园 DNS"]
-    DNS --> SPECIAL["物理 DNS / MagicDNS"]
+flowchart TB
+    APP["Windows 应用"] -->|"DNS UDP/TCP 53"| TUN["Mihomo TUN + dns-hijack"]
+    TUN --> DNS["Mihomo DNS 1053<br/>nameserver-policy"]
+    DNS -->|"普通 / 未知域名"| COND["条件 DNS 1054"]
+    DNS -->|"已知校园后缀"| CAMPUS["CAMPUS 组 → ZJU SOCKS 11080"]
+    DNS -->|"代理策略域名"| DOH["代理 DoH"]
+    DNS -->|"LAN / VPN bootstrap / Tailnet"| SPECIAL["物理 DNS / MagicDNS"]
+    COND -->|"先并发查询"| PUBLIC["公共 TCP DNS<br/>经 mixed-port 7890"]
+    COND -.->|"仅当全部公共结果为<br/>NXDOMAIN / NODATA"| CAMPUS
+    APP -->|"解析后的业务流量"| TUN
+    TUN --> ROUTE["Mihomo 进程 / 域名 / CIDR / 订阅规则"]
+    ROUTE --> DIRECT["DIRECT / LAN / Tailnet"]
+    ROUTE --> PROXY["现有订阅代理"]
+    ROUTE --> CAMPUS
 ```
+
+上图只用于快速定位组件。完整的查询入口、五条解析分支、请求与响应逐跳路径、启动依赖和故障行为见 [完整网络与 DNS 架构](docs/architecture.md)。
 
 关键思路：
 
